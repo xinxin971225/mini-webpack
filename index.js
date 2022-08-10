@@ -3,6 +3,7 @@ import path from "path";
 import ejs from "ejs";
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
+import { transformFromAst } from "babel-core";
 function createAsset(filePath) {
   // 获取数据源
   const source = fs.readFileSync(filePath, {
@@ -21,8 +22,13 @@ function createAsset(filePath) {
       deps.push(node.source.value);
     },
   });
+  // esm ->cjs
+  const { code } = transformFromAst(ast, null, {
+    presets: ["env"],
+  });
   return {
-    source,
+    filePath,
+    code,
     deps,
   };
 }
@@ -47,9 +53,10 @@ const graph = createGraph();
  * @param {*} graph
  */
 function build(graph) {
-  const template = fs.readFileSync("./bundle.ejs", { encoding: "utf-8" });
   // 这里采用ejs的方式通过模版把对应的图编译成require的样子
-  const code = ejs.render(template);
+  const template = fs.readFileSync("./bundle.ejs", { encoding: "utf-8" });
+  console.log("graph", graph);
+  const code = ejs.render(template, { data: graph });
   fs.writeFileSync("./dist/bundle.js", code);
 }
 build(graph);
