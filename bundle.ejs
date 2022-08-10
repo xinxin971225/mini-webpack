@@ -1,19 +1,24 @@
 !(function (modules) {
-  function require(filePath) {
+  function require(id) {
+    // 需要一个路径与方法的对应关系
 
-    const fn = modules[filePath];
+    const [fn, mappin] = modules[id];
     const module = {
       exports: {},
     };
-    fn(require, module, module.exports);
+    function localRequire(filePath) {
+      const id = mappin[filePath];
+      return require(id);
+    }
+    fn(localRequire, module, module.exports);
     return module.exports;
   }
 
-  require("./main.js");
+  require(0);
 })({
   <% data.forEach(data=>{ %>
-  "<%- data['filePath'] %>": function (require, module, exports) {
+  <%- data['id'] %>: [function (require, module, exports) {
        <%- data['code'] %>
-  },
+  },<%- JSON.stringify(data['mappin']) %>],
   <% })%>
 });

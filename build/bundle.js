@@ -1,30 +1,38 @@
 !(function (modules) {
-  function require(filePath) {
+  function require(id) {
     // 需要一个路径与方法的对应关系
 
-    const fn = modules[filePath];
+    const [fn, mappin] = modules[id];
     const module = {
       exports: {},
     };
-    fn(require, module, module.exports);
+    function localRequire(filePath) {
+      const id = mappin[filePath];
+      return require(id);
+    }
+    fn(localRequire, module, module.exports);
     return module.exports;
   }
 
-  require("./main.js");
+  require(0);
 })({
   /**
    * 目标通过类似cjs的形式去将图的模块关系打包到一起
    */
-  "./main.js": function (require, module, exports) {
-    // import { foo } from "./foo.js";
-    const { foo } = require("./foo.js");
-    foo();
-    function main() {
-      console.log("main");
-    }
-    main();
-  },
-  "./foo.js": function (require, module, exports) {
+  0: [
+    function (require, module, exports) {
+      const { foo } = require("./foo.js");
+      foo();
+      function main() {
+        console.log("main");
+      }
+      main();
+    },
+    {
+      "./foo.js": 1,
+    },
+  ],
+  1: function (require, module, exports) {
     function foo() {
       console.log(".foo");
     }
