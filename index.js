@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import ejs from "ejs";
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 function createAsset(filePath) {
@@ -39,4 +40,16 @@ function createGraph() {
   return queue;
 }
 
-console.log(createGraph());
+const graph = createGraph();
+
+/**
+ * 有了图就需要把他们build成cjs规范的require的样子
+ * @param {*} graph
+ */
+function build(graph) {
+  const template = fs.readFileSync("./bundle.ejs", { encoding: "utf-8" });
+  // 这里采用ejs的方式通过模版把对应的图编译成require的样子
+  const code = ejs.render(template);
+  fs.writeFileSync("./dist/bundle.js", code);
+}
+build(graph);
