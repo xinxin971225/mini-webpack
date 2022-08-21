@@ -4,12 +4,44 @@ import ejs from "ejs";
 import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 import { transformFromAst } from "babel-core";
+import { jsonLoader } from "./jsonLoader.js";
 let id = 0;
+
+const webpackConfig = {
+  module: {
+    rules: [
+      {
+        test: /\.json$/,
+        use: [jsonLoader],
+      },
+    ],
+  },
+};
+
 function createAsset(filePath) {
   // 获取数据源
-  const source = fs.readFileSync(filePath, {
+  let source = fs.readFileSync(filePath, {
     encoding: "utf-8",
   });
+
+  // initloader
+
+  const loaders = webpackConfig.module.rules;
+  const loaderContext = {
+    addDeps: (dep) => {
+      console.log(dep);
+    },
+  };
+  loaders.forEach(({ test, use }) => {
+    if (test.test(filePath)) {
+      if (Array.isArray(use)) {
+        use.forEach((fn) => {
+          source = fn.call(loaderContext, source);
+        });
+      }
+    }
+  });
+
   //   转化为抽象语法树
   const ast = parse(source, {
     sourceType: "module",
@@ -41,6 +73,7 @@ function createGraph() {
   const mainAsset = createAsset("./example/main.js");
   const queue = [mainAsset];
   for (const asset of queue) {
+    // 小细节，每有一个依赖queue就会变长，然后可以无限循环下去
     asset.deps.forEach((relativePath) => {
       const child = createAsset(path.resolve("./example", relativePath));
       queue.push(child);
