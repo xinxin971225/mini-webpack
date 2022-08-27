@@ -5,6 +5,8 @@ import { parse } from "@babel/parser";
 import traverse from "@babel/traverse";
 import { transformFromAst } from "babel-core";
 import { jsonLoader } from "./jsonLoader.js";
+import { SyncHook } from "tapable";
+import { ChangeOutputPath } from "./ChangeOutputPath.js";
 let id = 0;
 
 const webpackConfig = {
@@ -16,6 +18,12 @@ const webpackConfig = {
       },
     ],
   },
+
+  plugins: [new ChangeOutputPath()],
+};
+
+const hooks = {
+  emitFile: new SyncHook(["context"]),
 };
 
 function createAsset(filePath) {
@@ -24,7 +32,7 @@ function createAsset(filePath) {
     encoding: "utf-8",
   });
 
-  // initloader
+  // initLoader
 
   const loaders = webpackConfig.module.rules;
   const loaderContext = {
@@ -63,7 +71,7 @@ function createAsset(filePath) {
     filePath,
     code,
     deps,
-    mappin: {},
+    mapping: {},
     id: id++,
   };
 }
@@ -77,12 +85,18 @@ function createGraph() {
     asset.deps.forEach((relativePath) => {
       const child = createAsset(path.resolve("./example", relativePath));
       queue.push(child);
-      asset.mappin[relativePath] = child.id;
+      asset.mapping[relativePath] = child.id;
     });
   }
   return queue;
 }
-
+function initPlugins() {
+  const { plugins } = webpackConfig;
+  plugins.forEach((plugin) => {
+    plugin.apply(hooks);
+  });
+}
+initPlugins();
 const graph = createGraph();
 
 /**
@@ -93,6 +107,13 @@ function build(graph) {
   // 这里采用ejs的方式通过模版把对应的图编译成require的样子
   const template = fs.readFileSync("./bundle.ejs", { encoding: "utf-8" });
   const code = ejs.render(template, { data: graph });
-  fs.writeFileSync("./dist/bundle.js", code);
+  let outPath = "./dist/bundle.js";
+  const context = {
+    changeOutPath: (path) => {
+      outPath = path;
+    },
+  };
+  hooks.emitFile.call(context);
+  fs.writeFileSync(outPath, code);
 }
 build(graph);
